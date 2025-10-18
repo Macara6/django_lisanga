@@ -305,7 +305,7 @@ class CashOut(models.Model):
 
 class CashOutDetail(models.Model):
     cashout = models.ForeignKey(CashOut, related_name='details', on_delete=models.CASCADE)
-    reason = models.CharField(max_length=255)
+    reason = models.CharField(max_length=255, default="")
     amount = models.DecimalField(max_digits=10, decimal_places=2)
 
     def __str__(self): 
@@ -330,7 +330,7 @@ class Cycle(models.Model):
     def current_cycle(cls):
         """Retourne le cycle actif qui contient la date du jour"""
         today = timezone.now().date()
-        return cls.objects.filter(start_date__lte=today, end_date__gte=today, is_activa= True).first()
+        return cls.objects.filter(start_date__lte=today, end_date__gte=today, is_active= True).first()
 
 class PasswordResetCode(models.Model):
     user = models.ForeignKey(CustomUser, on_delete=models.CASCADE)
