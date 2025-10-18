@@ -305,7 +305,7 @@ class CashOut(models.Model):
 
 class CashOutDetail(models.Model):
     cashout = models.ForeignKey(CashOut, related_name='details', on_delete=models.CASCADE)
-    reason = models.CharField()
+    reason = models.CharField(max_length=255)
     amount = models.DecimalField(max_digits=10, decimal_places=2)
 
     def __str__(self): 
