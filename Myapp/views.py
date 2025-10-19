@@ -19,6 +19,8 @@ from django.contrib.auth import get_user_model
 from django.shortcuts import get_object_or_404
 from .serializers import *
 from .models import *
+from django.utils.decorators import method_decorator
+from django.views.decorators.csrf import csrf_exempt
 from channels.layers import get_channel_layer
 from asgiref.sync import async_to_sync
 User = get_user_model()
@@ -103,6 +105,27 @@ class UpdateUserView(generics.RetrieveUpdateAPIView):
         context = super().get_serializer_context()
         context.update({"request": self.request})
         return context
+    
+
+class UserDeleteView(generics.DestroyAPIView):
+    queryset = User.objects.all()
+    serializer_class= userViewSerializer
+    permission_classes = [IsAuthenticated]
+    
+    def delete(self, request,*args, **kwargs):
+        try:
+            user = self.get_object()
+            username = user.username
+            user.delete()
+            return Response(
+                {"message": f"L'utilisateur '{username}' a été supprimé avec succès."},
+                status=status.HTTP_204_NO_CONTENT
+            )
+        except Exception as e:
+            return Response(
+                {"detail": str(e)},
+                status=status.HTTP_404_NOT_FOUND
+            )
 #fin des views pour la gestion des utilisateurs 
 
 # debut des views pour le suppléant

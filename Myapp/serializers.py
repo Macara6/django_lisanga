@@ -29,6 +29,27 @@ class UserCreateSerializer(serializers.ModelSerializer):
             'password':{'write_only':True},
             'date_joined':{'read_only':True}
         }
+    
+     def validate_email(self,value):
+         """Vérifie  si l'email existe déjà"""
+         if User.objects.filter(email=value).exists():
+             raise serializers.ValidationError("Cet email est déjà utiliser pour un autre utilisateur")
+         return value
+
+     def validate_username(self, value):
+        """Vérifie qu'il n'y a pas d'espace dans le username."""
+        if ' ' in value:
+            raise serializers.ValidationError("Le nom d'utilisateur ne doit pas contenir d'espaces.")
+        return value
+        
+
+     def validate_matricule(self, value):
+          """Vérifie que le matricule n'est pas déjà utilisé."""
+          if User.objects.filter(matricule=value).exists():
+              raise serializers.ValidationError("Ce matricule est déjà utiliser pour un autre utilisateur")
+          return value
+     
+     
      def create(self, validated_data):
          password = validated_data.pop('password')
          user = User(**validated_data)

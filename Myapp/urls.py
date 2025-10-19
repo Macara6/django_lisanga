@@ -10,6 +10,7 @@ urlpatterns = [
     path('user/create/', UserCreateView.as_view(), name='user_create'),
     path('user/liste/',ListeUserView.as_view(), name ='user_liste'),
     path('user/detail/<int:pk>/', UserDetailView.as_view(), name='user_detail'),
+    path('user/<int:pk>/delete/', UserDeleteView.as_view(), name='delete_user'),
     path('UpdateUser/<int:id>/',UpdateUserView.as_view(), name='update_user'),
     path('change-password/', ChangePasswordView.as_view(), name='changer_mot de passe'),
     #envoi de mot de mots de passe de réinitialisation
