@@ -9,5 +9,6 @@ admin.site.register(Transaction)
 admin.site.register(CreditTransaction)
 admin.site.register(Credit)
 admin.site.register(CashOut)
+admin.site.register(CashOutDetail)
 admin.site.register(Cycle)
 
