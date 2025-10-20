@@ -272,10 +272,25 @@ class CreditTransaction(models.Model):
         if self.transaction_type =="ANNULATION":
             raise ValueError("Imposible d'annuler une transaction déjà annulée.")
         with db_transaction.atomic():
+            #annuler le credit
             if self.transaction_type =="CREDIT":
                 self.credit.princilal -= self.amount
+                interest_rate = self.credit.interset_rate or Decimal("0.0")
+                reduction = self.amount *(1 + interest_rate)
+                self.credit.total_due -= reduction
+
+                if self.credit.total_due < 0:
+                    self.credit.total_due = Decimal("0.00")
+                
+                if self.credit.balance_due > self.credit.total_due:
+                    self.credit.balance_due = self.credit.total_due
+                
+              
             elif self.transaction_type =="REMBOURSEMENT":
                 self.credit.balance_due +=self.amount
+
+                if self.credit.balance_due > self.credit.total_due:
+                   self.credit.balance_due = self.credit.total_due
             else:
                 raise ValueError("Type de transaction non reconnu pour annulation.")
             
