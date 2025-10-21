@@ -61,20 +61,22 @@ class CustomUser(AbstractUser):
     def total_interest_user(self):
         """Renvoie la part d'intérêt attribuée à cet utilisateur"""
         from .models import Credit
-        total_principal = Credit.objects.aggregate(Sum("princilal"))["princilal__sum"] or Decimal("0.0")
+        total_due = Credit.objects.aggregate(Sum("total_due"))["total_due__sum"] or Decimal("0.0")
         
-        if total_principal == 0:
+        if total_due == 0:
             return Decimal("0.0")
         
-        total_interest = total_principal * Decimal("0.10")
-        net_interest =total_interest * Decimal("0.90")
+        total_interest = total_due * Decimal("0.10")
+
+        net_interest = total_interest * Decimal("0.90")
 
         total_balance = CustomUser.objects.aggregate(Sum("balance"))["balance__sum"] or Decimal("0.0")
         if total_balance ==0:
             return Decimal("0.0")
         
-        user_interest =(self.balance / total_balance) * net_interest
-        return user_interest.quantize(Decimal("0.0"))
+        user_interest = (self.balance * net_interest) / total_balance
+
+        return user_interest.quantize(Decimal("0.01"))
 
     # --- Fonctions liées au compte ---
     def send_money(self, recipient, amount):
@@ -285,7 +287,6 @@ class CreditTransaction(models.Model):
                 if self.credit.balance_due > self.credit.total_due:
                     self.credit.balance_due = self.credit.total_due
                 
-              
             elif self.transaction_type =="REMBOURSEMENT":
                 self.credit.balance_due +=self.amount
 

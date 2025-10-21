@@ -143,6 +143,7 @@ DATABASES = {
 
 
 
+
 AUTH_USER_MODEL = 'Myapp.CustomUser'
 
 # Password validation

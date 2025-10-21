@@ -23,6 +23,7 @@ from django.utils.decorators import method_decorator
 from django.views.decorators.csrf import csrf_exempt
 from channels.layers import get_channel_layer
 from asgiref.sync import async_to_sync
+from django.db.models import Sum, Prefetch
 User = get_user_model()
 
 
@@ -80,10 +81,32 @@ class UserCreateView(generics.CreateAPIView):
     serializer_class = UserCreateSerializer
     permission_classes = [IsAuthenticated]
 
+
 class ListeUserView(generics.ListAPIView):
     queryset = User.objects.all().order_by('-date_joined')
     serializer_class = userViewSerializer
     permission_classes = [IsAuthenticated]
+
+    def get_queryset(self):
+
+        return(
+            User.objects.all().select_related("substitute").prefetch_related(
+                Prefetch(
+                    "credits",
+                    queryset=Credit.objects.filter(is_paid=False).only(
+                        "princilal", "total_due", "balance_due", "is_paid", "user_id"
+                    ),
+                    to_attr="unpaid_credits"
+                )
+            )
+            .annotate(
+                total_principal_unpaid=Sum("credits__princilal", filter=~models.Q(credits__is_paid=True)),
+                total_due_unpaid=Sum("credits__total_due", filter=~models.Q(credits__is_paid=True)),
+                total_balance_due_unpaid=Sum("credits__balance_due", filter=~models.Q(credits__is_paid=True)),
+            )
+            .order_by("-date_joined")
+        )
+
 
 class UserDetailView(generics.RetrieveAPIView):
     queryset = User.objects.all()

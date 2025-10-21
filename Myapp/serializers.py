@@ -5,6 +5,7 @@ User = get_user_model()
 from .models import *
 from django.core.mail import send_mail
 from django.conf import settings
+from django.db.models import Sum
 
 
 
@@ -66,8 +67,6 @@ class userViewSerializer(serializers.ModelSerializer):
     total_due_unpaid = serializers.SerializerMethodField()
     total_balance_due_unpaid = serializers.SerializerMethodField()
 
-
-
     class Meta:
         model = User
         fields = [
@@ -90,30 +89,61 @@ class userViewSerializer(serializers.ModelSerializer):
             'total_due_unpaid',
             'total_balance_due_unpaid',
         ]
+    def get_total_interest_user(self, obj):
+        """
+        Calcule la part d’intérêt attribuée à cet utilisateur.
+        """
+        total_due = Credit.objects.aggregate(Sum("total_due"))["total_due__sum"] or Decimal("0.0")
+        if total_due == 0:
+            return Decimal("0.0")
 
-    def get_total_interest_user(self,obj):
-        return obj.total_interest_user
+        # 10% du total des crédits = intérêt global
+        total_interest = total_due * Decimal("0.10")
+
+        # 90% après dîme (10%)
+        net_interest = total_interest * Decimal("0.90")
+
+        total_balance = User.objects.aggregate(Sum("balance"))["balance__sum"] or Decimal("0.0")
+        if total_balance == 0:
+            return Decimal("0.0")
+
+        user_interest = (obj.balance * net_interest) / total_balance
+        return round(user_interest, 2)
     
+    def _get_unpaid_totals(self, obj):
+        
+        if not hasattr(self, '_unipaid_cache'):
+            self._unipaid_cache ={}
+
+        if obj.id not in self._unipaid_cache:
+            aggregates = obj.credits.filter(is_paid=False).aggregate(
+                total_principal = Sum('princilal'),
+                total_due = Sum('total_due'),
+                total_balance_due =Sum('balance_due')
+            )
+
+            self._unipaid_cache[obj.id] ={
+                'total_principal_unpaid': aggregates['total_principal'] or 0,
+                'total_due_unpaid': aggregates['total_due'] or 0,
+                'total_balance_due_unpaid': aggregates['total_balance_due'] or 0,
+            }
+        return self._unipaid_cache[obj.id]
+
     def get_total_principal_unpaid(self, obj):
-        credits = obj.credits.filter(is_paid = False)
-        return sum(c.princilal for c in credits)
+        return self._get_unpaid_totals(obj)['total_principal_unpaid']
     
     def get_total_due_unpaid(self, obj):
-        credits = obj.credits.filter(is_paid = False)
-        return sum(c.total_due for c in credits)
+        return self._get_unpaid_totals(obj)['total_due_unpaid']
     
     def get_total_balance_due_unpaid(self, obj):
-        credits = obj.credits.filter(is_paid = False)
-        return sum(c.balance_due for c in credits)
+        return self._get_unpaid_totals(obj)['total_balance_due_unpaid']
     
     def __init__(self,*args, **kwargs):
         super().__init__(*args, **kwargs)
         user = self.context['request'].user
         if user.is_superuser:
-            self.fields['phone_number'].required = False
-            self.fields['adress'].required = False
-            self.fields['matricule'].required = False
-            self.fields['substitute'].required = False
+            for field in ['phone_number', 'adress', 'matricule', 'substitute']:
+                self.fields[field].required = False
 
 class CreateSubstuteSerialize(serializers.ModelSerializer):
     class Meta:
