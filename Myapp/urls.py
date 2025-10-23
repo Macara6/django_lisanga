@@ -3,6 +3,7 @@ from django.urls import path
 from.views import *
 from . import views
 
+
 urlpatterns = [
     path('', views.index, name='index'),
     path('refresh-token/',CustomTokenRefreshVieuw.as_view(), name='token_refresh'),
@@ -58,5 +59,8 @@ urlpatterns = [
     path('user/change-pin/', ChangePinView.as_view(), name='change-pin'),
     path('user/verify-pin/', VerifyPinView.as_view(), name='verify-pin'),
 
+
+    #route pour silk
+   
 ]
 

@@ -19,11 +19,13 @@ from django.contrib.auth import get_user_model
 from django.shortcuts import get_object_or_404
 from .serializers import *
 from .models import *
-from django.utils.decorators import method_decorator
 from django.views.decorators.csrf import csrf_exempt
 from channels.layers import get_channel_layer
 from asgiref.sync import async_to_sync
 from django.db.models import Sum, Prefetch
+from django.http import JsonResponse
+from django.core.cache import cache
+from django.views.decorators.cache import cache_page
 User = get_user_model()
 
 
@@ -86,9 +88,7 @@ class ListeUserView(generics.ListAPIView):
     queryset = User.objects.all().order_by('-date_joined')
     serializer_class = userViewSerializer
     permission_classes = [IsAuthenticated]
-
     def get_queryset(self):
-
         return(
             User.objects.all().select_related("substitute").prefetch_related(
                 Prefetch(
@@ -106,17 +106,30 @@ class ListeUserView(generics.ListAPIView):
             )
             .order_by("-date_joined")
         )
-
+    
 
 class UserDetailView(generics.RetrieveAPIView):
     queryset = User.objects.all()
     serializer_class = userViewSerializer
     permission_classes = [IsAuthenticated]
 
+    def get_queryset(self):
+        return (
+            User.objects.select_related("substitute")
+            .prefetch_related(
+                Prefetch(
+                    "credits",
+                    queryset=Credit.objects.only("princilal","total_due","balance_due","due_date","is_paid"),
+                )
+            )
+        )
+    
+   
     def get(self,request, *args, **kwargs):
         user = self.get_object()
-        serializer = self.get_serializer(user)
+        serializer= self.get_serializer(user)
         return Response(serializer.data, status=status.HTTP_200_OK)
+    
 
 class UpdateUserView(generics.RetrieveUpdateAPIView):
     queryset = User.objects.all()
@@ -448,16 +461,43 @@ class CycleListCreateView(APIView):
     """Lister tous les cycles et créer un nouveau cycle"""
     
     def get(self, request):
-        cycles = Cycle.objects.all()
-        serializer = CycleSerializer(cycles, many=True)
-        return Response(serializer.data)
+
+        cached_data = cache.get("fast_cycles_list")
+        if cached_data:
+            return JsonResponse(cached_data,safe=False)
+        
+        cycles = Cycle.objects.only("id","name","start_date","end_date","is_active").all()
+        data =[
+            {
+                "id":c.id,
+                "name":c.name,
+                "start_date":c.start_date.isoformat(),
+                "end_date":c.end_date.isoformat(),
+                "is_active": c.is_active,
+            }
+            for c in cycles
+        ]
+        cache.set("fast_cycles_list",data,60*5)
+
+        return JsonResponse(data,safe=False)
     
     def post(self, request):
         serializer = CycleSerializer(data=request.data)
         if serializer.is_valid():
-            serializer.save()
-            return Response(serializer.data, status=status.HTTP_201_CREATED)
-        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+            cycle = serializer.save()
+            cache.delete("fast_cycles_list")
+
+            return JsonResponse(
+                {
+                    "id":cycle.id,
+                    "name":cycle.name,
+                    "start_date":cycle.start_date.isoformat(),
+                    "end_date":cycle.end_date.isoformat(),
+                    "is_active": cycle.is_active,
+                },
+                status=status.HTTP_201_CREATED,
+            )
+        return JsonResponse(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
     
 class CycleDetailView(APIView):
     """Récupérer, modifier ou supprimer un cycle par ID"""

@@ -61,6 +61,7 @@ INSTALLED_APPS = [
     'rest_framework',
     'corsheaders',
     'channels',
+    'silk',
 ]
 ASGI_APPLICATION = "lisanga.asgi.application"
 
@@ -71,6 +72,7 @@ CHANNEL_LAYERS = {
 }
 
 MIDDLEWARE = [
+    "silk.middleware.SilkyMiddleware",
      "corsheaders.middleware.CorsMiddleware", 
     'django.middleware.security.SecurityMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
@@ -80,6 +82,15 @@ MIDDLEWARE = [
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
 ]
+
+
+SILKY_PYTHON_PROFILER = True        # Profilage détaillé des fonctions Python
+SILKY_META = True                    # Stocker les headers HTTP et info des requêtes
+SILKY_MAX_REQUEST_BODY_SIZE = -1     # Stocker le body complet (utile pour POST)
+SILKY_MAX_RESPONSE_BODY_SIZE = -1    # Stocker le response complet
+SILKY_AUTHENTICATION = True          # Seul l’admin peut voir Silk
+SILKY_AUTHORISATION = True
+
 CORS_ALLOWED_ORIGINS =[
 
 ]
@@ -138,6 +149,7 @@ DATABASES = {
         'PORT': '3306',              # Port MySQL par défaut
     }
 }
+
 
 
 

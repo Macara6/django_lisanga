@@ -57,16 +57,22 @@ class UserCreateSerializer(serializers.ModelSerializer):
          user.set_password(password)
          user.save()
          return user
+     
+class CreditSerializer(serializers.ModelSerializer):
+    compte_name = serializers.CharField(source = 'user.first_name', read_only = True)
+    class Meta:
+        model = Credit
+        fields =['id','princilal','total_due','balance_due','interset_rate','compte_name','is_paid', 'due_date', 'created_at']
 
 class userViewSerializer(serializers.ModelSerializer):
 
     substitute_name = serializers.CharField(source='substitute.first_name', read_only=True)
     total_interest_user = serializers.SerializerMethodField()
 
-    total_principal_unpaid = serializers.SerializerMethodField()
-    total_due_unpaid = serializers.SerializerMethodField()
-    total_balance_due_unpaid = serializers.SerializerMethodField()
-
+    total_principal_unpaid = serializers.DecimalField(max_digits=15, decimal_places=2, read_only=True)
+    total_due_unpaid = serializers.DecimalField(max_digits=15, decimal_places=2, read_only=True)
+    total_balance_due_unpaid = serializers.DecimalField(max_digits=15, decimal_places=2, read_only=True)
+    credits = CreditSerializer(many=True, read_only=True)
     class Meta:
         model = User
         fields = [
@@ -88,55 +94,35 @@ class userViewSerializer(serializers.ModelSerializer):
             'total_principal_unpaid',
             'total_due_unpaid',
             'total_balance_due_unpaid',
+            'credits'
         ]
     def get_total_interest_user(self, obj):
         """
         Calcule la part d’intérêt attribuée à cet utilisateur.
         """
-        total_due = Credit.objects.aggregate(Sum("total_due"))["total_due__sum"] or Decimal("0.0")
-        if total_due == 0:
+        total_due = getattr(self,"_totla_due_sum",None)
+        total_balance = getattr(self,"_total_balance_sum", None)
+
+        if total_due is None or total_balance is None:
+            self._total_due_sum=(
+                Credit.objects.aggregate(total_due=Sum("total_due"))["total_due"] or Decimal("0.0")
+            )
+            self._total_balance_sum =(
+                User.objects.aggregate(total_balance=Sum("balance"))["total_balance"] or Decimal("0.0")
+            )
+        
+        total_due = self._total_due_sum
+        total_balance = self._total_balance_sum
+
+        if total_due == 0 or total_balance ==0:
             return Decimal("0.0")
 
         # 10% du total des crédits = intérêt global
         total_interest = total_due * Decimal("0.10")
-
         # 90% après dîme (10%)
         net_interest = total_interest * Decimal("0.90")
-
-        total_balance = User.objects.aggregate(Sum("balance"))["balance__sum"] or Decimal("0.0")
-        if total_balance == 0:
-            return Decimal("0.0")
-
         user_interest = (obj.balance * net_interest) / total_balance
         return round(user_interest, 2)
-    
-    def _get_unpaid_totals(self, obj):
-        
-        if not hasattr(self, '_unipaid_cache'):
-            self._unipaid_cache ={}
-
-        if obj.id not in self._unipaid_cache:
-            aggregates = obj.credits.filter(is_paid=False).aggregate(
-                total_principal = Sum('princilal'),
-                total_due = Sum('total_due'),
-                total_balance_due =Sum('balance_due')
-            )
-
-            self._unipaid_cache[obj.id] ={
-                'total_principal_unpaid': aggregates['total_principal'] or 0,
-                'total_due_unpaid': aggregates['total_due'] or 0,
-                'total_balance_due_unpaid': aggregates['total_balance_due'] or 0,
-            }
-        return self._unipaid_cache[obj.id]
-
-    def get_total_principal_unpaid(self, obj):
-        return self._get_unpaid_totals(obj)['total_principal_unpaid']
-    
-    def get_total_due_unpaid(self, obj):
-        return self._get_unpaid_totals(obj)['total_due_unpaid']
-    
-    def get_total_balance_due_unpaid(self, obj):
-        return self._get_unpaid_totals(obj)['total_balance_due_unpaid']
     
     def __init__(self,*args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -164,11 +150,6 @@ class TransactionSerializer(serializers.ModelSerializer):
         fields = ['id', 'user', 'transaction_type', 'amount', 'balance_after', 'reference','compte_name' ,'created_at']
         read_only_fields = ['id', 'user', 'balance_after', 'reference', 'created_at']
 
-class CreditSerializer(serializers.ModelSerializer):
-    compte_name = serializers.CharField(source = 'user.first_name', read_only = True)
-    class Meta:
-        model = Credit
-        fields =['id','princilal','total_due','balance_due','interset_rate','compte_name','is_paid', 'due_date', 'created_at']
 
 #serializer transaction credit et remboursement      
 class CreditTransactionSerializer(serializers.ModelSerializer):
